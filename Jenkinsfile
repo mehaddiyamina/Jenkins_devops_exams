@@ -6,10 +6,10 @@ pipeline {
     DOCKERHUB_CREDS_ID = 'dockerhub-creds'
 
     // A REMPLACER par ton username DockerHub (souvent = ton username GitHub)
-    DOCKERHUB_USER = 'A_REMPLACER_DOCKERHUB_USER'
+    DOCKERHUB_USER = 'mehaddiyamina'
 
     // A REMPLACER : nom de release Helm (peut être ce que tu veux)
-    RELEASE_NAME = 'A_REMPLACER_RELEASE'
+    RELEASE_NAME = 'jenkins-exam'
 
     // Path chart (ici ton chart est dans ./charts)
     CHART_PATH = './charts'
