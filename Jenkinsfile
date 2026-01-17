@@ -2,24 +2,34 @@ pipeline {
   agent any
 
   environment {
-    // Jenkins credentials (type: Username with password)
-    DOCKERHUB_CREDS_ID = 'dockerhub-creds'
+    // identifiant Jenkins Credentials (Username + Password/PAT)
+    DOCKERHUB_CREDS = credentials('dockerhub-creds')
 
-    // A REMPLACER par ton username DockerHub (souvent = ton username GitHub)
-    DOCKERHUB_USER = 'mehaddiyamina'
+    // ton dockerhub username
+    DOCKERHUB_USER = "yamina99"
 
-    // A REMPLACER : nom de release Helm (peut être ce que tu veux)
-    RELEASE_NAME = 'jenkins-exam'
-
-    // Path chart (ici ton chart est dans ./charts)
-    CHART_PATH = './charts'
+    // helm chart
+    CHART_PATH   = "./charts"
+    RELEASE_NAME = "jenkins-exam"
   }
 
   stages {
 
     stage('Checkout') {
       steps {
-        checkout scm
+        git branch: 'master',
+          url: 'https://github.com/mehaddiyamina/Jenkins_devops_exams.git'
+      }
+    }
+
+    // ✅ IMPORTANT: login AVANT build, sinon docker ne peut pas pull python:3.8-slim
+    stage('DockerHub login (before build)') {
+      steps {
+        sh '''
+          set -e
+          echo "$DOCKERHUB_CREDS_PSW" | docker login -u "$DOCKERHUB_USER" --password-stdin
+          docker info >/dev/null
+        '''
       }
     }
 
@@ -29,17 +39,6 @@ pipeline {
           set -e
           docker-compose build
         '''
-      }
-    }
-
-    stage('DockerHub login') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDS_ID}", usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
-          sh '''
-            set -e
-            echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-          '''
-        }
       }
     }
 
@@ -56,8 +55,8 @@ pipeline {
       steps {
         sh '''
           set -e
-          helm upgrade --install ${RELEASE_NAME}-dev ${CHART_PATH} \
-            --namespace dev --create-namespace
+          export KUBECONFIG=/var/lib/jenkins/.kube/config
+          helm upgrade --install ${RELEASE_NAME}-dev ${CHART_PATH} --namespace dev --create-namespace
         '''
       }
     }
@@ -66,8 +65,8 @@ pipeline {
       steps {
         sh '''
           set -e
-          helm upgrade --install ${RELEASE_NAME}-qa ${CHART_PATH} \
-            --namespace qa --create-namespace
+          export KUBECONFIG=/var/lib/jenkins/.kube/config
+          helm upgrade --install ${RELEASE_NAME}-qa ${CHART_PATH} --namespace qa --create-namespace
         '''
       }
     }
@@ -76,22 +75,27 @@ pipeline {
       steps {
         sh '''
           set -e
-          helm upgrade --install ${RELEASE_NAME}-staging ${CHART_PATH} \
-            --namespace staging --create-namespace
+          export KUBECONFIG=/var/lib/jenkins/.kube/config
+          helm upgrade --install ${RELEASE_NAME}-staging ${CHART_PATH} --namespace staging --create-namespace
         '''
       }
     }
 
     stage('Deploy PROD (manual)') {
-      when { branch 'master' }
+      when { expression { return false } } // tu l'actives manuellement si l'exam le demande
       steps {
-        input message: "Valider le déploiement PROD ?", ok: "DEPLOY"
         sh '''
           set -e
-          helm upgrade --install ${RELEASE_NAME}-prod ${CHART_PATH} \
-            --namespace prod --create-namespace
+          export KUBECONFIG=/var/lib/jenkins/.kube/config
+          helm upgrade --install ${RELEASE_NAME}-prod ${CHART_PATH} --namespace prod --create-namespace
         '''
       }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker logout || true'
     }
   }
 }
